@@ -10,7 +10,7 @@ This project analyzes Zepto grocery product data using PostgreSQL and Power BI. 
 
 > Add your dashboard screenshot here.
 
-![Dashboard](Dashboard/dashboard.png)
+![Dashboard](Dashboard/dashboard-1.png)
 
 ---
 
