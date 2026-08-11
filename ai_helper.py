@@ -12,7 +12,7 @@ def ask_gemini(user_prompt, api_key=None, schema_info=None):
     if not api_key:
         return {
             "sql": None,
-            "explanation": "⚠️ **Gemini API Key Required**: Please enter your Gemini API Key in the sidebar or set `GEMINI_API_KEY` in Streamlit Secrets to enable live AI responses.",
+            "explanation": "⚠️ **Gemini API Key Required**: Please enter your Gemini API Key starting with `AIzaSy...` in the sidebar (or in Streamlit Secrets) to enable AI analytics.",
             "demo": True
         }
 
@@ -72,8 +72,22 @@ INSTRUCTIONS:
         }
 
     except Exception as e:
+        err_msg = str(e)
+        if "401" in err_msg or "UNAUTHENTICATED" in err_msg or "invalid authentication" in err_msg.lower():
+            friendly_err = """⚠️ **Invalid Gemini API Key**: The API key provided was rejected (401 Unauthenticated).
+
+### How to get a working API Key:
+1. Open **[aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)** (100% Free).
+2. Click **Create API Key**.
+3. Copy the key starting with **`AIzaSy...`** and paste it into the **Gemini API Key** field in the left sidebar!"""
+            return {
+                "sql": None,
+                "explanation": friendly_err,
+                "demo": False
+            }
+        
         return {
             "sql": None,
-            "explanation": f"❌ **AI Error**: Failed to query Gemini API: {str(e)}",
+            "explanation": f"❌ **AI Error**: Failed to query Gemini API: {err_msg}",
             "demo": False
         }
