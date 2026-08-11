@@ -12,7 +12,7 @@ def ask_gemini(user_prompt, api_key=None, schema_info=None):
     if not api_key:
         return {
             "sql": None,
-            "explanation": "⚠️ **Gemini API Key Required**: Please enter your Gemini API Key starting with `AIzaSy...` in the sidebar (or in Streamlit Secrets) to enable AI analytics.",
+            "explanation": "⚠️ **Gemini API Key Required**: Please enter your Gemini API Key in the sidebar or set `GEMINI_API_KEY` in Streamlit Secrets.",
             "demo": True
         }
 
@@ -48,10 +48,25 @@ INSTRUCTIONS:
 3. Do not invent non-existent table or column names.
 """
 
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt
-        )
+        # Try supported models in order of priority
+        candidate_models = ['gemini-flash-latest', 'gemini-3.6-flash', 'gemini-2.5-flash-lite', 'gemini-pro-latest']
+        response = None
+        last_err = None
+
+        for m_name in candidate_models:
+            try:
+                response = client.models.generate_content(
+                    model=m_name,
+                    contents=prompt
+                )
+                if response and hasattr(response, 'text') and response.text:
+                    break
+            except Exception as e_mod:
+                last_err = e_mod
+                continue
+
+        if not response or not hasattr(response, 'text'):
+            raise last_err or Exception("Could not generate content from Gemini API.")
 
         text = response.text
 
@@ -79,7 +94,7 @@ INSTRUCTIONS:
 ### How to get a working API Key:
 1. Open **[aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)** (100% Free).
 2. Click **Create API Key**.
-3. Copy the key starting with **`AIzaSy...`** and paste it into the **Gemini API Key** field in the left sidebar!"""
+3. Copy your key and paste it into the **Gemini API Key** field in the left sidebar!"""
             return {
                 "sql": None,
                 "explanation": friendly_err,
