@@ -15,26 +15,63 @@ def read_csv_safe(path):
     # Ultimate fallback with error replacement
     return pd.read_csv(path, encoding='utf-8', encoding_errors='replace')
 
+def process_dataframe(df):
+    """Normalizes column names and data types for seamless SQL and Streamlit usage."""
+    if df.empty:
+        return df
+
+    # Map column names case-insensitively
+    rename_map = {}
+    for col in df.columns:
+        c_clean = str(col).strip()
+        c_lower = c_clean.lower()
+        if c_lower == 'category':
+            rename_map[col] = 'category'
+        elif c_lower == 'name':
+            rename_map[col] = 'name'
+        elif c_lower == 'mrp':
+            rename_map[col] = 'mrp'
+        elif c_lower in ['discountpercent', 'discount_percent']:
+            rename_map[col] = 'discountPercent'
+        elif c_lower in ['availablequantity', 'available_quantity']:
+            rename_map[col] = 'availableQuantity'
+        elif c_lower in ['discountedsellingprice', 'discountsellingprice']:
+            rename_map[col] = 'discountedSellingPrice'
+        elif c_lower in ['weightingms', 'weight_in_gms']:
+            rename_map[col] = 'weightInGms'
+        elif c_lower in ['outofstock', 'out_of_stock']:
+            rename_map[col] = 'outOfStock'
+        elif c_lower == 'quantity':
+            rename_map[col] = 'quantity'
+        else:
+            rename_map[col] = c_clean
+
+    df = df.rename(columns=rename_map)
+
+    # Ensure dual availability of discountSellingPrice / discountedSellingPrice for legacy SQL queries
+    if 'discountedSellingPrice' in df.columns and 'discountSellingPrice' not in df.columns:
+        df['discountSellingPrice'] = df['discountedSellingPrice']
+
+    # Clean string values
+    if 'category' in df.columns:
+        df['category'] = df['category'].astype(str).str.strip()
+    if 'name' in df.columns:
+        df['name'] = df['name'].astype(str).str.strip()
+
+    # Clean boolean outOfStock
+    if 'outOfStock' in df.columns:
+        df['outOfStock'] = df['outOfStock'].astype(str).str.upper().map(
+            {'TRUE': True, 'FALSE': False, '1': True, '0': False}
+        ).fillna(False)
+
+    return df
+
 def get_connection():
     """Returns a DuckDB in-memory database connection with `zepto` table pre-loaded."""
     conn = duckdb.connect(database=':memory:')
     if os.path.exists(DATASET_PATH):
         df = read_csv_safe(DATASET_PATH)
-        # Ensure column compatibility with SQL queries
-        if 'discountedSellingPrice' in df.columns and 'discountSellingPrice' not in df.columns:
-            df['discountSellingPrice'] = df['discountedSellingPrice']
-        
-        # Clean string columns
-        if 'category' in df.columns:
-            df['category'] = df['category'].astype(str).str.strip()
-        if 'name' in df.columns:
-            df['name'] = df['name'].astype(str).str.strip()
-            
-        # Ensure boolean outOfStock
-        if 'outOfStock' in df.columns:
-            df['outOfStock'] = df['outOfStock'].astype(str).str.upper().map({'TRUE': True, 'FALSE': False, '1': True, '0': False}).fillna(False)
-
-        # Register dataframe as 'zepto' table in DuckDB
+        df = process_dataframe(df)
         conn.register('zepto', df)
     return conn
 
@@ -42,13 +79,5 @@ def load_data():
     """Loads dataset into Pandas DataFrame."""
     if os.path.exists(DATASET_PATH):
         df = read_csv_safe(DATASET_PATH)
-        if 'discountedSellingPrice' in df.columns and 'discountSellingPrice' not in df.columns:
-            df['discountSellingPrice'] = df['discountedSellingPrice']
-        if 'category' in df.columns:
-            df['category'] = df['category'].astype(str).str.strip()
-        if 'name' in df.columns:
-            df['name'] = df['name'].astype(str).str.strip()
-        if 'outOfStock' in df.columns:
-            df['outOfStock'] = df['outOfStock'].astype(str).str.upper().map({'TRUE': True, 'FALSE': False, '1': True, '0': False}).fillna(False)
-        return df
+        return process_dataframe(df)
     return pd.DataFrame()
